@@ -303,9 +303,10 @@ ui <- fluidPage(
           selectInput("group", "Enter group", choices = unique(
                    
           sort(DBI::dbReadTable(dbConnect(odbc::odbc(), 
-                            .connection_string = "Driver={MySQL ODBC 8.0 Unicode Driver};",
-                            Server="127.0.0.1", Database="mouse_phenotype_database", UID = "root",
-                            PWD="MySQLino2021!?", Port=3306), "mouse_info")[,"GroupID"])
+                .connection_string = "Driver={MySQL ODBC 8.0 Unicode Driver};",
+                Server="204.2.195.88", Database="mouse_phenotype_database",
+                UID = "guest_mpd_app",
+                PWD="fuffu_2021_!?_sambapati", Port=17703), "mouse_info")[,"GroupID"])
 
                       )),
                  
