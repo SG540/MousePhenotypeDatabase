@@ -492,7 +492,8 @@ server <- function(input, output, session) {
                     plot.margin = unit(c(.8,.8,.8,.8), "cm"))
             
           } else if (str_detect(input$task, "fz")) { #fz
-            tb1 <- tb1 %>% transform(Genotype = factor(Genotype, levels=sort(unique(tb$Genotype))))
+            tb1 <- tb1 %>% transform(Genotype = factor(Genotype, levels=sort(unique(tb$Genotype)))) %>%
+              dplyr::mutate_if(is.integer,as.numeric)
             
             if (input$task == "fz_day1") { #day1
               if (i < 3) { #freezing/distance
