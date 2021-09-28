@@ -309,10 +309,10 @@ server <- function(input, output, session) {
         dplyr::mutate(TM_PercentageOfCorrectResponses = TM_NumberOfCorrectResponses / TM_NumberOfFreeChoices * 100)
     } else if (input$task == "of"){
       tb <- tb %>%
-        mutate(OF_Distance = slide_vec(.x = OF_Distance, .f = mean, .after = 4),
-               OF_CentTime = slide_vec(.x = OF_CentTime, .f = mean, .after = 4),
-               OF_VerAct = slide_vec(.x = OF_VerAct, .f = mean, .after = 4),
-               OF_StCounts = slide_vec(.x = OF_StCounts, .f = mean, .after = 4)) %>%
+        mutate(OF_Distance = slide_vec(.x = OF_Distance, .f = mean, .before = 4),
+               OF_CentTime = slide_vec(.x = OF_CentTime, .f = mean, .before = 4),
+               OF_VerAct = slide_vec(.x = OF_VerAct, .f = mean, .before = 4),
+               OF_StCounts = slide_vec(.x = OF_StCounts, .f = mean, .before = 4)) %>%
         filter(OF_Time %% 5 == 0)
     } else if (input$task == "bm_t01"){
       tb <- dplyr::filter(tb, BM_Time <= 15)
