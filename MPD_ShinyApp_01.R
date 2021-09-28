@@ -307,6 +307,13 @@ server <- function(input, output, session) {
     if(input$task == "tm_t01"){
       tb <- dplyr::filter(tb, TM_Time <= 5) %>%
         dplyr::mutate(TM_PercentageOfCorrectResponses = TM_NumberOfCorrectResponses / TM_NumberOfFreeChoices * 100)
+    } else if (input$task == "of"){
+      tb <- tb %>%
+        mutate(OF_Distance = slide_vec(.x = OF_Distance, .f = mean, .after = 4),
+               OF_CentTime = slide_vec(.x = OF_CentTime, .f = mean, .after = 4),
+               OF_VerAct = slide_vec(.x = OF_VerAct, .f = mean, .after = 4),
+               OF_StCounts = slide_vec(.x = OF_StCounts, .f = mean, .after = 4)) %>%
+        filter(OF_Time %% 5 == 0)
     } else if (input$task == "bm_t01"){
       tb <- dplyr::filter(tb, BM_Time <= 15)
     } else if (input$task == "bm_probe"){
@@ -446,7 +453,7 @@ server <- function(input, output, session) {
                     axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
                     axis.title.x = element_text(size = 15),
                     axis.text.y = element_text(size = 12),
-                    axis.text.x = element_text(size = 12),
+                    axis.text.x = element_text(size = 12, angle = 45, vjust=1, hjust=1),
                     axis.line = element_line(size = 1),
                     axis.ticks = element_line(size = 1),
                     axis.ticks.length = unit(.3, "cm"),
@@ -499,8 +506,7 @@ server <- function(input, output, session) {
                     plot.margin = unit(c(.8,.8,.8,.8), "cm"))
             
           } else if (str_detect(input$task, "fz")) { #fz
-            tb1 <- tb1 %>% transform(Genotype = factor(Genotype, levels=sort(unique(tb$Genotype)))) %>%
-              dplyr::mutate_if(is.integer,as.numeric)
+            tb1 <- tb1 %>% transform(Genotype = factor(Genotype, levels=sort(unique(tb$Genotype))))
             
             if (input$task == "fz_day1") { #day1
               if (i < 3) { #freezing/distance
@@ -514,7 +520,7 @@ server <- function(input, output, session) {
                   annotate("rect", xmin = 2, xmax = 2.5, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6) +
                   annotate("rect", xmin = 4, xmax = 4.5, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6) +
                   annotate("rect", xmin = 6, xmax = 6.5, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6) +
-                  stat_summary(aes(group=Genotype, colour=Genotype), fun=mean, geom="line", size=1) + 
+                  stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
                   stat_compare_means(aes(group = Genotype), label = "p.signif") +
                   # annotate("text", x=1,y=60,label=paste(italic(P), "=", stat.test$p)) +
                   # stat_compare_means(aes(group = Genotype), label = "p.signif") +
@@ -542,7 +548,7 @@ server <- function(input, output, session) {
                   ggline(tb2, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", 
                          facet.by = "FZ_Day1_Shock", alpha=0.7) +
                   annotate("rect", xmin = 7, xmax = 15, ymin = -Inf, ymax = Inf,  fill = "#474a4d", alpha=.6) +
-                  stat_summary(aes(group=Genotype, colour=Genotype), fun=mean, geom="line", size=1) + 
+                  stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
                   # annotate("text", x=12, y=18, label=paste("P =", stat.test$p)) +
                   scale_color_viridis_d(label=labels) +
                   scale_x_discrete(breaks=seq(0, 6, by=1)) + 
@@ -572,7 +578,7 @@ server <- function(input, output, session) {
                 
                 Plot <- 
                   ggline(tb1, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", alpha=0.7) +
-                  stat_summary(aes(group=Genotype, colour=Genotype), fun=mean, geom="line", size=1) + 
+                  stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
                   stat_compare_means(aes(group = Genotype), label = "p.signif") +
                   # annotate("text", x=12, y=18, label=paste("P =", stat.test$p)) +
                   scale_color_viridis_d(label=labels) +
@@ -602,7 +608,7 @@ server <- function(input, output, session) {
                 Plot <- 
                   ggline(tb1, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", alpha=0.7) +
                   annotate("rect", xmin = 3, xmax = 6, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=0.6) +
-                  stat_summary(aes(group=Genotype, colour=Genotype), fun=mean, geom="line", size=1) + 
+                  stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
                   stat_compare_means(aes(group = Genotype), label = "p.signif") +
                   # annotate("text", x=12, y=18, label=paste("P =", stat.test$p)) +
                   scale_color_viridis_d(label=labels) +
@@ -644,7 +650,7 @@ server <- function(input, output, session) {
               ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", alpha=0.7) +
               annotate("rect", xmin = xminli, xmax = xmaxli, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6) +
               annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
-              stat_summary(aes(group=Genotype, colour=Genotype), fun=mean, geom="line", size=1) + 
+              stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
               # annotate("text", x=1,y=60,label=paste(italic(P), "=", stat.test$p)) +
               # stat_compare_means(aes(group = Genotype), label = "p.signif") +
               scale_color_viridis_d(label=labels) +
@@ -759,28 +765,55 @@ server <- function(input, output, session) {
             }
             stat.test <- head(stat.test, n=1)
             stat.test$x.position <- max(tb[,xaxis],na.rm=TRUE)*0.7
-            stat.test$y.position <- max(tb[,List_var[i]],na.rm=TRUE)*0.9
+            stat.test$y.position <- max(tb[,List_var[i]],na.rm=TRUE)*0.85
             
-            Plot <- 
-              ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
-              annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
-              scale_color_viridis_d(label=labels) +
-              xlab(xlab) +
-              ylab(List_label[i]) +
-              theme_classic() + 
-              theme(text = element_text(size = 15),
-                    axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
-                    axis.title.x = element_text(size = 15),
-                    axis.text.y = element_text(size = 12),
-                    axis.text.x = element_text(size = 12),
-                    axis.line = element_line(size = 1),
-                    axis.ticks = element_line(size = 1),
-                    axis.ticks.length = unit(.3, "cm"),
-                    legend.text.align = 0,
-                    legend.title = element_blank(), 
-                    legend.text=element_text(size = 15), #,face="bold"
-                    panel.border = element_blank(),
-                    plot.margin = unit(c(.8,.8,.8,.8), "cm"))
+            if (input$task == "of"){
+              Plot <- 
+                ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
+                annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
+                scale_color_viridis_d(label=labels) +
+                scale_x_continuous(limits = c(NA,max(tb[,xaxis],na.rm=TRUE)),
+                                   breaks = seq(max(tb[,xaxis],na.rm=TRUE) %% 2, max(tb[,xaxis],na.rm=TRUE), by = as.integer(max(tb[,xaxis],na.rm=TRUE)/24))) +
+                xlab(xlab) +
+                ylab(List_label[i]) +
+                theme_classic() + 
+                theme(text = element_text(size = 15),
+                      axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
+                      axis.title.x = element_text(size = 15),
+                      axis.text.y = element_text(size = 12),
+                      axis.text.x = element_text(size = 12, angle = 45, vjust=1, hjust=1),
+                      axis.line = element_line(size = 1),
+                      axis.ticks = element_line(size = 1),
+                      axis.ticks.length = unit(.3, "cm"),
+                      legend.text.align = 0,
+                      legend.title = element_blank(), 
+                      legend.text=element_text(size = 15), #,face="bold"
+                      panel.border = element_blank(),
+                      plot.margin = unit(c(.8,.8,.8,.8), "cm"))
+            } else{
+              Plot <- 
+                ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
+                annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
+                scale_color_viridis_d(label=labels) +
+                scale_x_continuous(limits = c(NA,max(tb[,xaxis],na.rm=TRUE)),
+                                   breaks = seq(max(tb[,xaxis],na.rm=TRUE) %% 2, max(tb[,xaxis],na.rm=TRUE), by = as.integer(max(tb[,xaxis],na.rm=TRUE)/6))) +
+                xlab(xlab) +
+                ylab(List_label[i]) +
+                theme_classic() + 
+                theme(text = element_text(size = 15),
+                      axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
+                      axis.title.x = element_text(size = 15),
+                      axis.text.y = element_text(size = 12),
+                      axis.text.x = element_text(size = 12),
+                      axis.line = element_line(size = 1),
+                      axis.ticks = element_line(size = 1),
+                      axis.ticks.length = unit(.3, "cm"),
+                      legend.text.align = 0,
+                      legend.title = element_blank(), 
+                      legend.text=element_text(size = 15), #,face="bold"
+                      panel.border = element_blank(),
+                      plot.margin = unit(c(.8,.8,.8,.8), "cm"))
+            }
           }
         })
         
