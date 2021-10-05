@@ -27,6 +27,57 @@ library(shinyBS)
 library(ggplot2)
 library(dbplyr)
 
+####Setting task options#####
+task_list <- c(
+  "bm_t01"="Barnes Maze",
+  "bm_probe"="Barnes Maze Probe",
+  "crsoc_t01"="Crawley Social Interaction",
+  "ep_t01"="Elevated Plus Maze",
+  "fz_day1"="Fear Conditioning Day 1",
+  "fz_day2"="Fear Conditioning Day 2",
+  "fz_day3"="Fear Conditioning Day 3",
+  "ghns_t01"="General Assessment",
+  "hc"="Home Cage Social Interaction",
+  "hp_t01"="Hot Plate",
+  "ld_t01"="Light/Dark Transition",
+  "of"="Open Field",
+  "ps"="Porsolt Swim",
+  "ps_t02"="Porsolt Swim Day 2",
+  "ppi_t01"="Pre-Pulse Inhibition",
+  "rr"="Rotarod",
+  "si"="Social Interaction",
+  "ts"="Tail Suspension",
+  "tm_t01"="T-Maze"
+)
+
+mouse_list <- sort(read.xlsx("../Tables/mouse_info.xlsx")[,"GroupID"])
+names(mouse_list) <- sort(read.xlsx("../Tables/mouse_info.xlsx")[,"MouseID"])
+tasks <- vector("list", 2)
+flag <- vector("list", 2)
+for (file in list.files("../Tables", ".xlsx", full.names = T)){
+  # file <- "../Tables/bm_probe_sum_t01.xlsx"
+  if (!"MouseID" %in% colnames(read.xlsx(file))){next}
+  for (item in set_task_key){ #determine which already read files
+    if (str_detect(file, item)){
+      task_prefix = item
+      task_name <- task_list[task_prefix] %>% as.character()
+    }
+  }
+  if (flag[task_prefix] == "yes"){next} #skip already read files
+  flag_tmp <- "yes"
+  names(flag_tmp) <- task_prefix
+  flag <- c(flag, flag_tmp)
+  print(task_prefix)
+  
+  group_list <- mouse_list[sort(read.xlsx(file)[,"MouseID"])] %>% 
+    as.character() %>%
+    unique()
+  for (group in group_list){ #add task name for each groupID in list
+    list_tmp <- task_prefix
+    names(list_tmp) <- task_name
+    tasks[[group]] <- c(tasks[[group]], list_tmp)
+  }
+}
 
 ####connection####
 
@@ -848,7 +899,12 @@ server <- function(input, output, session) {
                  file, rowNames = FALSE)
     }
   )
-  
+
+  observeEvent(input$group,
+               {
+                 updateSelectizeInput(session, input = "task",
+                                      choices = tasks[[input$group]])
+               })
 }
 
 ####ui####
@@ -876,29 +932,38 @@ ui <- fluidPage(
                      
                    )),
                    
-                   selectInput("task", "Enter task", choices = c(
-                     
-                     "Barnes Maze"="bm_t01",
-                     "Barnes Maze Probe"="bm_probe",
-                     "Crawley Social Interaction"="crsoc_t01",
-                     "Elevated Plus Maze"="ep_t01",
-                     "Fear Conditioning Day 1"="fz_day1",
-                     "Fear Conditioning Day 2"="fz_day2",
-                     "Fear Conditioning Day 3"="fz_day3",
-                     "General Assessment"="ghns_t01",
-                     "Home Cage Social Interaction"="hc",
-                     "Hot Plate"="hp_t01",
-                     "Light/Dark Transition"="ld_t01",
-                     "Open Field"="of",
-                     "Porsolt Swim"="ps",
-                     "Porsolt Swim Day 2"="ps_t02", #GS: not the best of the designs
-                     "Pre-Pulse Inhibition"="ppi_t01",
-                     "Rotarod"="rr",
-                     "Social Interaction"="si",
-                     "Tail Suspension"="ts",
-                     "T-Maze"="tm_t01"
-                     
-                   )),
+                   selectInput(
+                     "task",
+                     "Enter task",
+                     # We can initialize this as NULL because
+                     # we will update in the server function.
+                     choices = NULL,
+                     # multiple = TRUE
+                   ),
+                   
+                   # selectInput("task", "Enter task", choices = c(
+                   #   
+                   #   "Barnes Maze"="bm_t01",
+                   #   "Barnes Maze Probe"="bm_probe",
+                   #   "Crawley Social Interaction"="crsoc_t01",
+                   #   "Elevated Plus Maze"="ep_t01",
+                   #   "Fear Conditioning Day 1"="fz_day1",
+                   #   "Fear Conditioning Day 2"="fz_day2",
+                   #   "Fear Conditioning Day 3"="fz_day3",
+                   #   "General Assessment"="ghns_t01",
+                   #   "Home Cage Social Interaction"="hc",
+                   #   "Hot Plate"="hp_t01",
+                   #   "Light/Dark Transition"="ld_t01",
+                   #   "Open Field"="of",
+                   #   "Porsolt Swim"="ps",
+                   #   "Porsolt Swim Day 2"="ps_t02", #GS: not the best of the designs
+                   #   "Pre-Pulse Inhibition"="ppi_t01",
+                   #   "Rotarod"="rr",
+                   #   "Social Interaction"="si",
+                   #   "Tail Suspension"="ts",
+                   #   "T-Maze"="tm_t01"
+                   #   
+                   # )),
                    
                    selectInput("tableorplot", "Enter Table or Plot", choices = c("Table","Plot")),
                    #bsTooltip(id = "tableorplot", 
