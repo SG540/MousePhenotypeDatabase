@@ -27,80 +27,6 @@ library(shinyBS)
 library(ggplot2)
 library(dbplyr)
 
-####Setting task options#####
-set_task_key <- c(
-  "bm_t01",
-  "bm_probe",
-  "crsoc_t01",
-  "ep_t01",
-  "fz_day1",
-  "fz_day2",
-  "fz_day3",
-  "ghns_t01",
-  "hc",
-  "hp_t01",
-  "ld_t01",
-  "of",
-  "ps",
-  "ps_t02", #GS: not the best of the designs
-  "ppi_t01",
-  "rr",
-  "si",
-  "ts",
-  "tm_t01"
-)
-
-set_task_val <- list("Barnes Maze",
-                  "Barnes Maze Probe",
-                  "Crawley Social Interaction",
-                  "Elevated Plus Maze",
-                  "Fear Conditioning Day 1",
-                  "Fear Conditioning Day 2",
-                  "Fear Conditioning Day 3",
-                  "General Assessment",
-                  "Home Cage Social Interaction",
-                  "Hot Plate",
-                  "Light/Dark Transition",
-                  "Open Field",
-                  "Porsolt Swim",
-                  "Porsolt Swim Day 2",
-                  "Pre-Pulse Inhibition",
-                  "Rotarod",
-                  "Social Interaction",
-                  "Tail Suspension",
-                  "T-Maze")
-
-hash_set_task <- list2env(setNames(set_task_val, set_task_key), hash = TRUE) # set task name hash
-
-mouse_list <- sort(read.xlsx("../Tables/mouse_info.xlsx")[,"GroupID"])
-names(mouse_list) <- sort(read.xlsx("../Tables/mouse_info.xlsx")[,"MouseID"])
-tasks <- vector("list", 2) #this list will be refered at selectInput in ui function
-flag <- vector("list", 2)
-for (file in list.files("../Tables", ".xlsx", full.names = T)){ #load all files one by one
-  # file <- "../Tables/bm_probe_sum_t01.xlsx"
-  if (!"MouseID" %in% colnames(read.xlsx(file))){next} #skip group_info file
-  for (item in set_task_key){ #determine which file is being loaded
-    if (str_detect(file, item)){
-      task_prefix = item
-      task_name <- unlist(mget(task_prefix, envir = hash_set_task)) %>% as.character()
-    }
-  }
-  if (flag[task_prefix] == "yes"){next} #skip already read files
-  flag_tmp <- "yes"
-  names(flag_tmp) <- task_prefix
-  flag <- c(flag, flag_tmp)
-  print(task_prefix)
-  
-  group_list <- mouse_list[sort(read.xlsx(file)[,"MouseID"])] %>% 
-    as.character() %>%
-    unique()
-  for (group in group_list){ #add task name for each groupID in list
-    list_tmp <- task_prefix
-    names(list_tmp) <- task_name
-    tasks[[group]] <- c(tasks[[group]], list_tmp)
-  }
-}
-
 
 ####connection####
 
@@ -182,7 +108,7 @@ server <- function(input, output, session) {
       "ppi_t01",
       "tm_t01")) {
       
-      dplyr::right_join(DBI::dbReadTable(connection, input$task),
+      dplyr::inner_join(DBI::dbReadTable(connection, input$task),
                         mouse_info,by="MouseID")
       
     } else if (input$task %in% c(
@@ -191,31 +117,31 @@ server <- function(input, output, session) {
       "fz_day3")) {
       
      
-      dplyr::right_join(DBI::dbReadTable(connection, paste0(input$task)),
+      dplyr::inner_join(DBI::dbReadTable(connection, paste0(input$task)),
                         mouse_info,by="MouseID") %>%
-        left_join(., DBI::dbReadTable(connection, paste0(input$task,"_sum")), by="MouseID")
+        dplyr::inner_join(., DBI::dbReadTable(connection, paste0(input$task,"_sum")), by="MouseID")
       
     } else if (input$task=="ps_t02") {
       
       
-      dplyr::right_join(DBI::dbReadTable(connection, paste0(input$task)),
+      dplyr::inner_join(DBI::dbReadTable(connection, paste0(input$task)),
                         mouse_info,by="MouseID") %>%
-        left_join(., DBI::dbReadTable(connection, paste0("ps_sum_t02")), by="MouseID")
+        dplyr::inner_join(., DBI::dbReadTable(connection, paste0("ps_sum_t02")), by="MouseID")
       
     } else if (input$task %in% c("si","hc")) {
       
       
-      dplyr::right_join(DBI::dbReadTable(connection, paste0(input$task, "_t01")),
+      dplyr::inner_join(DBI::dbReadTable(connection, paste0(input$task, "_t01")),
                         DBI::dbReadTable(connection, paste0(input$task, "_sum_t01")),
                         by=paste0(toupper(input$task),"_TrialID")) %>%
-        right_join(., mouse_info, by="MouseID")
+        dplyr::inner_join(., mouse_info, by="MouseID")
       
     } else {
       
       
-      dplyr::right_join(DBI::dbReadTable(connection, paste0(input$task,"_t01")),
+      dplyr::inner_join(DBI::dbReadTable(connection, paste0(input$task,"_t01")),
                         mouse_info,by="MouseID") %>%
-        left_join(., DBI::dbReadTable(connection, paste0(input$task,"_sum_t01")), by="MouseID")
+        dplyr::inner_join(., DBI::dbReadTable(connection, paste0(input$task,"_sum_t01")), by="MouseID")
       
     }
     
