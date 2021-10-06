@@ -110,6 +110,14 @@ connection <- tryCatch({dbConnect(odbc::odbc(),
                                   UID = "guest_mpd_app",
                                   PWD="fuffu_2021_!?_sambapati", Port=17703)},
                        
+		       error = function(e)
+                         
+                       {dbConnect(odbc::odbc(),
+                                  .connection_string = "Driver={MySQL ODBC 8.0 Unicode Driver};",
+                                  Server="127.0.0.1", Database="mouse_phenotype_database",
+                                  UID = "root",
+                                  PWD="MySQLino2021!?", Port=3306)},
+		       
                        error = function(e)
                        
                       {dbConnect(odbc::odbc(),
@@ -117,6 +125,33 @@ connection <- tryCatch({dbConnect(odbc::odbc(),
                                   Server="204.2.195.88", Database="mouse_phenotype_database",
                                   UID = "guest_mpd_app",
                                   PWD="fuffu_2021_!?_sambapati", Port=17703)})
+
+
+####Choices####
+
+choices_list <- c(
+  
+  "Barnes Maze Probe"="bm_probe",
+  "Barnes Maze"="bm_t01",
+  "Crawley Social Interaction"="crsoc_t01",
+  "Elevated Plus Maze"="ep_t01",
+  "Fear Conditioning Day 1"="fz_day1",
+  "Fear Conditioning Day 2"="fz_day2",
+  "Fear Conditioning Day 3"="fz_day3",
+  "General Assessment"="ghns_t01",
+  "Home Cage Social Interaction"="hc",
+  "Hot Plate"="hp_t01",
+  "Light/Dark Transition"="ld_t01",
+  "Open Field"="of",
+  "Porsolt Swim"="ps",
+  "Porsolt Swim Day 2"="ps_t02",
+  "Pre-Pulse Inhibition"="ppi_t01",
+  "Rotarod"="rr",
+  "Social Interaction"="si",
+  "T-Maze"="tm_t01",
+  "Tail Suspension"="ts"
+  
+)
 
 
 ####Server####
@@ -186,7 +221,27 @@ server <- function(input, output, session) {
     
   })
   
+  choices_idx <- reactive({
+
+  mouse_info <- DBI::dbReadTable(connection, "mouse_info") %>%
+    dplyr::select(MouseID,Genotype,Gender,GroupID) %>%
+    dplyr::filter(!Genotype=="X") %>%
+    dplyr::filter(GroupID==input$group)
   
+  num_rows <- NULL
+  
+  for (i in task_list) {
+    
+    a <- nrow(dplyr::inner_join(DBI::dbReadTable(connection, i),
+                                mouse_info,by="MouseID"))
+    
+    num_rows <- c(num_rows,a)
+    
+  }
+  
+  return(choices_list[which(num_rows != 0)])
+  
+	})
   
   #outputs ----
   
@@ -926,7 +981,7 @@ server <- function(input, output, session) {
   observeEvent(input$group,
                {
                  updateSelectizeInput(session, input = "task",
-                                      choices = tasks[[input$group]])
+                                      choices = choices_idx())
                })
 }
 
@@ -964,38 +1019,16 @@ ui <- fluidPage(
                      # multiple = TRUE
                    ),
                    
-                   # selectInput("task", "Enter task", choices = c(
-                   #   
-                   #   "Barnes Maze"="bm_t01",
-                   #   "Barnes Maze Probe"="bm_probe",
-                   #   "Crawley Social Interaction"="crsoc_t01",
-                   #   "Elevated Plus Maze"="ep_t01",
-                   #   "Fear Conditioning Day 1"="fz_day1",
-                   #   "Fear Conditioning Day 2"="fz_day2",
-                   #   "Fear Conditioning Day 3"="fz_day3",
-                   #   "General Assessment"="ghns_t01",
-                   #   "Home Cage Social Interaction"="hc",
-                   #   "Hot Plate"="hp_t01",
-                   #   "Light/Dark Transition"="ld_t01",
-                   #   "Open Field"="of",
-                   #   "Porsolt Swim"="ps",
-                   #   "Porsolt Swim Day 2"="ps_t02", #GS: not the best of the designs
-                   #   "Pre-Pulse Inhibition"="ppi_t01",
-                   #   "Rotarod"="rr",
-                   #   "Social Interaction"="si",
-                   #   "Tail Suspension"="ts",
-                   #   "T-Maze"="tm_t01"
-                   #   
-                   # )),
+      
                    
                    selectInput("tableorplot", "Enter Table or Plot", choices = c("Table","Plot")),
                    #bsTooltip(id = "tableorplot", 
                          #    title = "Please select"),
                    
                    downloadLink("downloadData", "Download Table"),
-                   bsTooltip(id = "downloadData", 
+                   bsTooltip(id = "downloadData", #for some reason, this does not work
                              title = "If a download window pops up, please specify the name of the file
-                             with the .xlsx extension.")),
+                             with the .xlsx extension.")), 
                  
                  mainPanel(
                    conditionalPanel(condition="input.tableorplot == 'Table'",
