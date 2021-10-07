@@ -104,7 +104,7 @@ task_list <- c(
 
 group_info <- unique(DBI::dbReadTable(connection, "mouse_info")[,"GroupID"])
 group_choices <- group_info[!(group_info %in% 
-    c("CKII_10th","CKII_11th","CKII_3rd","Gomafu_3rd","LIS1_6th","Shn2_12th","Shn2_6th"))]
+                                c("CKII_10th","CKII_11th","CKII_3rd","Gomafu_3rd","LIS1_6th","Shn2_12th","Shn2_6th"))]
 
 
 ####Server####
@@ -393,15 +393,15 @@ server <- function(input, output, session) {
     } else if (input$task == "of"){
       tb <- tb %>%
         dplyr::mutate(OF_Distance = slide_vec(.x = OF_Distance, .f = mean, .before = 4),
-               OF_CentTime = slide_vec(.x = OF_CentTime, .f = mean, .before = 4),
-               OF_VerAct = slide_vec(.x = OF_VerAct, .f = mean, .before = 4),
-               OF_StCounts = slide_vec(.x = OF_StCounts, .f = mean, .before = 4)) %>%
+                      OF_CentTime = slide_vec(.x = OF_CentTime, .f = mean, .before = 4),
+                      OF_VerAct = slide_vec(.x = OF_VerAct, .f = mean, .before = 4),
+                      OF_StCounts = slide_vec(.x = OF_StCounts, .f = mean, .before = 4)) %>%
         filter(OF_Time %% 5 == 0)
     } else if (input$task == "bm_t01"){
       tb <- dplyr::filter(tb, BM_Time <= 15)
     } else if (input$task == "bm_probe"){
       tb <- dplyr::filter(tb, str_detect(BM_probe_SubTrialNumber, "PT"))# %>%
-       # dplyr::mutate_if(is.integer,as.numeric)#not sure if correct
+      # dplyr::mutate_if(is.integer,as.numeric)#not sure if correct
     } else if (input$task == "ppi_t01"){
       tb <- pivot_longer(tb, contains("ASR"), names_to = "ASR", values_to = "PPI_ASR_value", names_prefix = "PPI_ASR") %>%
         pivot_longer(contains("PPI_PPI"), names_to = "PPI", values_to = "PPI_PPI_value", names_prefix = "PPI_PPI") %>%
@@ -411,7 +411,7 @@ server <- function(input, output, session) {
       if (input$task == "fz_day1"){
         tb <- tb %>%
           dplyr::mutate(FZ_Day1_Experiment = NA) #%>%
-          #dplyr::mutate_if(is.integer,as.numeric)
+        #dplyr::mutate_if(is.integer,as.numeric)
         tb2 <- dplyr::filter(tb, FZ_Day1_Type=="Distance_Shock") %>%
           dplyr::filter(!FZ_Day1_Time %in% c(24,48) & !is.na(FZ_Day1_DV)) %>% # I think that this part should be treated when making database
           dplyr::mutate(FZ_Day1_Time = case_when(FZ_Day1_Time>24 & FZ_Day1_Time<48 ~ FZ_Day1_Time - 1, 
@@ -856,7 +856,7 @@ server <- function(input, output, session) {
                 annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
                 scale_color_viridis_d(label=labels) +
                 scale_x_continuous(limits = c(NA,max(tb[,xaxis],na.rm=TRUE)),
-                                   breaks = seq(max(tb[,xaxis],na.rm=TRUE) %% 2, max(tb[,xaxis],na.rm=TRUE), by = as.integer(max(tb[,xaxis],na.rm=TRUE)/24))) +
+                                   breaks = seq(max(tb[,xaxis],na.rm=TRUE) %% 2, max(tb[,xaxis],na.rm=TRUE), by = as.integer(max(tb[,xaxis],na.rm=TRUE)/6))) + #24->6
                 xlab(xlab) +
                 ylab(List_label[i]) +
                 theme_classic() + 
@@ -864,7 +864,7 @@ server <- function(input, output, session) {
                       axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
                       axis.title.x = element_text(size = 15),
                       axis.text.y = element_text(size = 12),
-                      axis.text.x = element_text(size = 12, angle = 45, vjust=1, hjust=1),
+                      axis.text.x = element_text(size = 12),#, angle = 45, vjust=1, hjust=1),
                       axis.line = element_line(size = 1),
                       axis.ticks = element_line(size = 1),
                       axis.ticks.length = unit(.3, "cm"),
@@ -878,8 +878,8 @@ server <- function(input, output, session) {
                 ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
                 annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
                 scale_color_viridis_d(label=labels) +
-                #scale_x_continuous(limits = c(NA,max(tb[,xaxis],na.rm=TRUE)),
-                                 #  breaks = seq(max(tb[,xaxis],na.rm=TRUE) %% 2, max(tb[,xaxis],na.rm=TRUE), by = as.integer(max(tb[,xaxis],na.rm=TRUE)/6))) +
+                scale_x_continuous(limits = c(NA,max(tb[,xaxis],na.rm=TRUE)),
+                breaks = seq(max(tb[,xaxis],na.rm=TRUE) %% 2, max(tb[,xaxis],na.rm=TRUE), by = as.integer(max(tb[,xaxis],na.rm=TRUE)/5))) + #6->5
                 xlab(xlab) +
                 ylab(List_label[i]) +
                 theme_classic() + 
