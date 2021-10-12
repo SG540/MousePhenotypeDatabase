@@ -824,6 +824,7 @@ mkplot <- function(datasetInput, group, task){
 
 for (group in group_list){
   # group <- "Aldh_1st"
+  dir.create(group, recursive = TRUE)
   mouse_info <- mouse_info_all %>%
     dplyr::filter(GroupID==group)
   num_rows <- NULL
@@ -834,7 +835,6 @@ for (group in group_list){
   task_1group_list <- task_list[which(num_rows != 0)]
   for (task in task_1group_list){
     datasetInput <-  dplyr::inner_join(get(paste0("task_", task)), mouse_info)
-    dir.create(group, recursive = TRUE)
     mkplot(datasetInput, group, task)
   }
 }
