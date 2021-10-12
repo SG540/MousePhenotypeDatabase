@@ -298,7 +298,7 @@ mkplot <- function(datasetInput, group, task){
   xaxis <- unlist(mget(task, envir = hash_xaxis)) %>% as.character()
   xlab <- unlist(mget(task, envir = hash_xlab)) %>% as.character()
 
-    tb <- datasetInput %>%
+  tb <- datasetInput %>%
     dplyr::mutate_if(is.integer,as.numeric)
   
   # filtering if needed
@@ -713,7 +713,7 @@ mkplot <- function(datasetInput, group, task){
             stat.test <- tb1 %>%
               group_by(Genotype) %>%
               t_test(as.formula(paste0(List_var[i], "~", xaxis[i])), paired = T)
-            stat.test$y.position <- c(rep(seq(max(tb1[,List_var[i]])*0.9, max(tb1[,List_var[i]])*1.1, by=max(tb1[,List_var[i]])/20)[1:1],length(unique(tb1[,xaxis[i]]))))
+            stat.test$y.position <- c(rep(seq(max(tb1[,List_var[i]])*0.9, max(tb1[,List_var[i]])*1.1, by=max(tb1[,List_var[i]])/20)[1:1],length(unique(stat.test$Genotype))))
             
             Plot <- 
               ggbarplot(tb1, x=xaxis[i], y=List_var[i], fill="Genotype", add = "mean_se", alpha=xaxis[i], facet.by = "Genotype") +
@@ -823,8 +823,8 @@ mkplot <- function(datasetInput, group, task){
 
 
 for (group in group_list){
-  # group <- "Aldh_1st"
   dir.create(group, recursive = TRUE)
+  # group <- "AppEKI_1st"
   mouse_info <- mouse_info_all %>%
     dplyr::filter(GroupID==group)
   num_rows <- NULL
