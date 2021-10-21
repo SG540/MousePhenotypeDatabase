@@ -963,15 +963,15 @@ server <- function(input, output, session) {
               stat.test$y.position <- (mean(tb[[List_var[i]]],na.rm=TRUE) + 2 * sd(tb[[List_var[i]]],na.rm=TRUE))
               if(input$task == "of"){
                 tb <- tb %>%
-                  dplyr::select(-c(OF_SUM_Drug,OF_SUM_Notes)) %>%
+                  dplyr::select(-c(OF_SUM_Drug,OF_SUM_Notes,OF_SUM_EquipmentNumber)) %>%
                   na.omit()
                 Plot <- ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
                   annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4)
-              }else{
+              } else {
                 Plot <- ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
                   annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4)
               }
-            } else{
+            } else {
               Plot <- ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE)
             }
             # stat.test <- tb %>%
@@ -992,11 +992,8 @@ server <- function(input, output, session) {
                  #ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
                  #annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
                 scale_color_viridis_d(label=labels) +
-                 #scale_x_continuous(limits = c(NA,max(tb[[xaxis]],na.rm=TRUE)),
-                  #                 breaks = seq(max(tb[[xaxis]],na.rm=TRUE) %% 2, max(tb[[xaxis]],na.rm=TRUE), by = as.integer(max(tb[[xaxis]],na.rm=TRUE)/6))) + #24->6
-                scale_x_continuous(limits = c(NA,max(tb[[xaxis]],na.rm=TRUE)),
-                                   breaks = seq(0, 120, by = 20)) + #24->6
-                
+                 scale_x_continuous(limits = c(NA,max(tb[[xaxis]],na.rm=TRUE)),
+                                   breaks = seq(max(tb[[xaxis]],na.rm=TRUE) %% 2, max(tb[[xaxis]],na.rm=TRUE), by = as.integer(max(tb[[xaxis]],na.rm=TRUE)/6))) + #24->6              
                 coord_cartesian(ylim = c(NA, (mean(tb[[List_var[i]]],na.rm=TRUE) + 3 * sd(tb[[List_var[i]]],na.rm=TRUE)))) +
                 xlab(xlab) +
                 ylab(List_label[i]) +
