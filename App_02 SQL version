@@ -1146,7 +1146,7 @@ ui <- fluidPage(
                  )),
         tabPanel("About", HTML("
         
-      Version 0.2 (2021/10/6 of the <b>Mouse Phenotype Database App</b><br/>
+      Version 0.2 (2021/10/21 of the <b>Mouse Phenotype Database App</b><br/>
       by <i>Giovanni Sala</i> (Fujita University, University of Liverpool)<br/>
       and <i>Daiki Sato</i> (Chiba University).<br/>
       Maintainer: Giovanni Sala (sala.giovanni475@gmail.com)<br/>
