@@ -38,13 +38,6 @@ connection <- tryCatch({dbConnect(odbc::odbc(),
                        
                        error = function(e)
                          
-                       {dbConnect(odbc::odbc(),
-                                  .connection_string = "Driver={MySQL ODBC 8.0 Unicode Driver};",
-                                  Server="127.0.0.1", Database="mouse_phenotype_database",
-                                  UID = "root",
-                                  PWD="MySQLino2021!?", Port=3306)},
-                       
-                       error = function(e)
                          
                        {dbConnect(odbc::odbc(),
                                   .connection_string = "Driver={MySQL ODBC 8.0 Unicode Driver};",
@@ -105,6 +98,8 @@ task_list <- c(
 group_info <- unique(DBI::dbReadTable(connection, "mouse_info")[,"GroupID"])
 group_choices <- group_info[!(group_info %in% 
                                 c("CKII_10th","CKII_11th","CKII_3rd","Gomafu_3rd","LIS1_6th","Shn2_12th","Shn2_6th"))]
+
+
 
 
 ####Server####
@@ -213,11 +208,8 @@ server <- function(input, output, session) {
   
   ## NB. need to find a way to sort the bars of the plots in alphabetical order
   
-  output$plot <- renderPlot({
+  mkplot <- reactive({
     
-    
-    
-    # task name
     keys <- list("ghns_t01", 
                  "ld_t01",
                  "ep_t01",
@@ -373,7 +365,6 @@ server <- function(input, output, session) {
     hash_xlab <- list2env(setNames(val_xlab, keys), hash = TRUE) # x label
     
     
-    
     # set variables
     prefix <- unlist(mget(input$task, envir = hash_task))
     List_var <- paste0(prefix, "_", unlist(mget(input$task, envir = hash_varname))) %>% as.character()
@@ -396,7 +387,7 @@ server <- function(input, output, session) {
                       OF_CentTime = slide_vec(.x = OF_CentTime, .f = mean, .before = 4),
                       OF_VerAct = slide_vec(.x = OF_VerAct, .f = mean, .before = 4),
                       OF_StCounts = slide_vec(.x = OF_StCounts, .f = mean, .before = 4)) %>%
-        filter(OF_Time %% 5 == 0)
+        dplyr::filter(OF_Time %% 5 == 0)
     } else if (input$task == "bm_t01"){
       tb <- dplyr::filter(tb, BM_Time <= 15)
     } else if (input$task == "bm_probe"){
@@ -412,6 +403,7 @@ server <- function(input, output, session) {
         tb <- tb %>%
           dplyr::mutate(FZ_Day1_Experiment = NA) #%>%
         #dplyr::mutate_if(is.integer,as.numeric)
+        
         tb2 <- dplyr::filter(tb, FZ_Day1_Type=="Distance_Shock") %>%
           dplyr::filter(!FZ_Day1_Time %in% c(24,48) & !is.na(FZ_Day1_DV)) %>% # I think that this part should be treated when making database
           dplyr::mutate(FZ_Day1_Time = case_when(FZ_Day1_Time>24 & FZ_Day1_Time<48 ~ FZ_Day1_Time - 1, 
@@ -425,7 +417,8 @@ server <- function(input, output, session) {
                                                  (FZ_Day1_Time-1) %/% 23 == 1 ~ as.numeric(as.numeric(FZ_Day1_Time-23)/4+0.25),
                                                  (FZ_Day1_Time-1) %/% 23 == 2 ~ as.numeric(as.numeric(FZ_Day1_Time-46)/4+0.25),
                                                  TRUE ~ FZ_Day1_Time))
-      } 
+      }
+      
       tb1 <- dplyr::select(tb, c("MouseID","Genotype",paste0(prefix,c("_Type","_Experiment","_Time","_DV")))) %>%
         dplyr::filter(get(paste0(prefix,"_Type")) != "Distance_Shock") %>% 
         dplyr::filter(get(paste0(prefix,"_Time")) <= 8) %>%
@@ -434,7 +427,6 @@ server <- function(input, output, session) {
         pivot_wider(names_from = contains(paste0(prefix,"_Type")), 
                     values_from = contains(paste0(prefix,"_DV")),
                     names_prefix = paste0(prefix,"_"))
-      
     } else if (input$task == "crsoc_t01"){
       tb <- tb %>%
         dplyr::filter(CrSoc_SubID != "00") %>%
@@ -468,43 +460,98 @@ server <- function(input, output, session) {
         distinct()
     }
     
+    n_samples <- tb %>% 
+      dplyr::select(MouseID, Genotype) %>%
+      distinct() %>%
+      group_by(Genotype) %>%
+      dplyr::summarize(n = n())
+    comp_gen_list <- n_samples %>% 
+      filter(n > 1) %>%
+      pull(Genotype)
     
     if (input$task %in% keys) {
       myplots <- vector('list', length(List_var))
       
       for (i in seq_along(List_var)) {
+        print(i)
         labels <- NULL
         labels = c()
         tb_tmp <- tb %>%
+          filter(Genotype %in% comp_gen_list) %>%
           group_by(MouseID) %>%
           do(head(., 1))
+        
         for (n in unique(tb_tmp$Genotype)){
           labels = sort(c(labels, paste0(n, " (n = ", table(tb_tmp$Genotype)[n], ")")))
         }
-        tb <- tb %>% 
-          # filter(!is.na(get(List_var[i]))) %>%
-          transform(Genotype = factor(Genotype, levels=sort(unique(tb$Genotype))))
-        ncomb <- length(unique(tb_tmp$Genotype)) * (length(unique(tb_tmp$Genotype))-1) / 2
         
+        # if (length(unique(tb$Genotype)) > 1) {
+        #   tb <- tb %>% 
+        #     # filter(!is.na(get(List_var[i]))) %>%
+        #     transform(Genotype = factor(Genotype, levels=sort(unique(tb$Genotype))))
+        # }
+        tb <- tb %>%
+          # filter(!is.na(get(List_var[i]))) %>%
+          transform(Genotype = factor(Genotype, levels=sort(unique(tb$Genotype)))) %>%
+          filter(Genotype %in% comp_gen_list)
+        ncomb <- length(unique(tb_tmp$Genotype)) * (length(unique(tb_tmp$Genotype))-1) / 2
         #message(i)
+        if (xaxis[1] == "Genotype" && unique(is.na(tb[[List_var[i]]])) == TRUE){next}
         myplots[[i]] <- local({
           i <- i
           
           if (xaxis[1] == "Genotype") {
-            stat.test <- tb %>% #obtain p-values
-              t_test(as.formula(paste0(List_var[i], " ~ Genotype"))) %>%
-              add_xy_position(x = "Genotype")
-            
-            Plot <- 
-              ggboxplot(tb, x = "Genotype", y = List_var[i],
-                        fill = "Genotype", alpha=0.5)+ 
-              # stat_compare_means(label.y = I(max(tb[,List_var[i]]) + 
-              #                                  I(12*sd(tb[,List_var[i]])/sqrt(length(tb[,1]))
+            if (length(unique(tb$Genotype)) > 1 & length(unique(tb[[List_var[i]]])) > 1){ # filter out data with no variation in values
+              genNA <- data.frame()
+              if(length(unique(tb$Genotype)) > 2){
+                genlist <- list()
+                for (j in 1:(length(unique(tb$Genotype))-1)){ # avoid getting NA when testing among genotypes with no variation(for data with 3 or more genotypes)
+                  for (k in (j+1):length(unique(tb$Genotype))){
+                    if(length(unique(tb[tb$Genotype == unique(tb$Genotype)[j] | tb$Genotype == unique(tb$Genotype)[k], List_var[i]])) != 1){
+                      genlist <- c(genlist, list(c(unique(tb$Genotype)[j] %>% as.character(), 
+                                                   unique(tb$Genotype)[k] %>% as.character())))
+                    }else{
+                      genNA <- bind_rows(genNA, data.frame(group1 = unique(tb$Genotype)[j], group2 = unique(tb$Genotype)[k], p = NA))
+                    }
+                  }
+                }
+              }
+              if(nrow(genNA) > 0){
+                stat.test <- tb %>% #obtain p-values
+                  filter(Genotype %in% comp_gen_list) %>% # filter out group with only 1 sample when testing
+                  t_test(as.formula(paste0(List_var[i], " ~ Genotype")), comparisons = genlist) %>%
+                  add_xy_position(x = "Genotype") %>%
+                  bind_rows(., genNA)
+              }else{
+                stat.test <- tb %>% #obtain p-values
+                  filter(Genotype %in% comp_gen_list) %>% # filter out group with only 1 sample when testing
+                  t_test(as.formula(paste0(List_var[i], " ~ Genotype"))) %>%
+                  add_xy_position(x = "Genotype")
+              }
+              Plot <- 
+                ggboxplot(tb, x = "Genotype", y = List_var[i], fill = "Genotype", alpha=0.5) + 
+                stat_pvalue_manual(stat.test, label = "p", tip.length = 0.01, vjust=-0.5)
+            } else {
+              stat.test <- data.frame(p="NA")
+              Plot <- 
+                ggboxplot(tb, x = "Genotype", y = List_var[i], fill = "Genotype", alpha=0.5)
+            }
+            # if(length(unique(tb$Genotype)) > 3){
+            #   Plot <- Plot + coord_cartesian(ylim = c(NA, max(tb[[List_var[i]]]) + length(unique(tb$Genotype)) * (length(unique(tb$Genotype))-1)/2 * (max(tb[[List_var[i]]]) - mean(tb[[List_var[i]]]))/6 ))
+            # }else{
+            #   Plot <- Plot + coord_cartesian(ylim = c(NA, max(tb[[List_var[i]]])*1.1))
+            # }
+            Plot <- Plot +
+              # ggboxplot(tb, x = "Genotype", y = List_var[i],
+              # fill = "Genotype", alpha=0.5)+ 
+              # stat_compare_means(label.y = I(max(tb[[List_var[i]]]) + 
+              #                                  I(12*sd(tb[[List_var[i]]])/sqrt(length(tb[,1]))
               #                                  )))+
-              stat_pvalue_manual(stat.test, label = "p", tip.length = 0.01, vjust=-0.5) +
-              geom_jitter(aes(x=Genotype, y=tb[,List_var[i]]), col = "black", height = 0, width = .2, alpha=.6) +
+              # stat_pvalue_manual(stat.test, label = "p", tip.length = 0.01, vjust=-0.5) +
+              geom_jitter(aes(x=Genotype, y=get(List_var[i])), col = "black", height = 0, width = .2, alpha=.6) +
               scale_fill_viridis_d(label=labels) +
-              coord_cartesian(ylim = c(NA, max(tb[,List_var[i]])*1.1)) +
+              # coord_cartesian(ylim = c(NA, max(tb[[List_var[i]]])*1.1)) +
+              coord_cartesian(ylim = c(NA, max(tb[[List_var[i]]]) + length(unique(tb$Genotype)) * (length(unique(tb$Genotype))-1)/2 * (max(tb[[List_var[i]]]) - mean(tb[[List_var[i]]]))/6)) +
               ylab(List_label[i]) +
               #theme_bw() +
               theme_classic() + 
@@ -521,14 +568,11 @@ server <- function(input, output, session) {
                     legend.text.align = 0,
                     panel.border = element_blank(),
                     plot.margin = unit(c(.8,.8,.8,.8), "cm"))
-            
           } else if (input$task == "bm_probe") {
-            
-            Plot <- 
-              ggbarplot(tb, x=xaxis, y=List_var[i], fill="Genotype", add = "mean_se", 
-                        facet.by="BM_probe_SubTrialNumber", position = position_dodge(0.9), alpha=0.7) +
+            Plot <- ggbarplot(tb, x=xaxis, y=List_var[i], fill="Genotype", add = "mean_se", 
+                              facet.by="BM_probe_SubTrialNumber", position = position_dodge(0.9), alpha=0.7) +
               scale_fill_viridis_d(label=labels) +
-              scale_y_continuous(expand = c(0, 0)) +
+              scale_y_continuous(expand = c(0, 0)) + 
               xlab(xlab) +
               ylab(List_label[i]) +
               theme_classic() + 
@@ -545,27 +589,48 @@ server <- function(input, output, session) {
                     legend.text=element_text(size = 15), #,face="bold"
                     panel.border = element_blank(),
                     strip.background = element_blank(),
-                    plot.margin = unit(c(.8,.8,.8,.8), "cm"))
-            
+                    plot.margin = unit(c(.8,.8,.8,.8), "cm")) 
           } else if (input$task == "ppi_t01") {
             tb <- tb %>%
               dplyr::select(-contains(xaxis[3-i])) %>%
+              filter(Genotype %in% comp_gen_list) %>%
               distinct()
-            stat.test <- tb %>% #obtain p-values
-              group_by(get(xaxis[i])) %>%
-              t_test(as.formula(paste0(List_var[i], " ~ Genotype"))) %>%
-              add_xy_position(x = "Genotype") #%>%
-            colnames(stat.test)[1] <- xaxis[i]
-            stat.test$y.position <- c(rep(seq(max(tb[,List_var[i]])*0.9, max(tb[,List_var[i]])*1.1, by=max(tb[,List_var[i]])/20)[1:ncomb],length(unique(tb[,xaxis[i]]))))
             
-            Plot <- 
-              ggbarplot(tb, x="Genotype", y=List_var[i], fill="Genotype", add = "mean_se", 
-                        facet.by = xaxis[i], alpha=0.5) +
+            if (length(unique(tb$Genotype)) > 1 & length(unique(tb[[List_var[i]]])) > 1){ # filter out data with no variation in values
+              stat.test <- tb %>% #obtain p-values
+                filter(Genotype %in% comp_gen_list) %>% # filter out group with only 1 sample when testing
+                group_by(get(xaxis[i])) %>%
+                t_test(as.formula(paste0(List_var[i], " ~ Genotype"))) %>%
+                add_xy_position(x = "Genotype")
+              colnames(stat.test)[1] <- xaxis[i]
+              stat.test$y.position <- c(rep(seq(max(tb[[List_var[i]]], na.rm=TRUE)*0.9, 
+                                                max(tb[[List_var[i]]], na.rm=TRUE)*0.9 + length(unique(tb$Genotype)) * (length(unique(tb$Genotype))-1)/2 * (max(tb[[List_var[i]]], na.rm=TRUE) - mean(tb[[List_var[i]]], na.rm=TRUE))/6, 
+                                                by=max(tb[[List_var[i]]], na.rm=TRUE)/20)[1:ncomb],
+                                            length(unique(tb[,xaxis[i]]))
+              )
+              )
+              
+              Plot <- ggbarplot(tb, x="Genotype", y=List_var[i], fill="Genotype", add = "mean_se", facet.by = xaxis[i], alpha=0.5) +
+                stat_pvalue_manual(stat.test, label = "p", tip.length = 0.01, vjust=-0.5)
+            } else {
+              Plot <- ggbarplot(tb, x="Genotype", y=List_var[i], fill="Genotype", add = "mean_se", facet.by = xaxis[i], alpha=0.5)
+            }
+            # stat.test <- tb %>% #obtain p-values
+            #   group_by(get(xaxis[i])) %>%
+            #   t_test(as.formula(paste0(List_var[i], " ~ Genotype"))) %>%
+            #   add_xy_position(x = "Genotype") #%>%
+            # colnames(stat.test)[1] <- xaxis[i]
+            # stat.test$y.position <- c(rep(seq(max(tb[[List_var[i]]])*0.9, max(tb[[List_var[i]]])*1.1, by=max(tb[[List_var[i]]])/20)[1:ncomb],length(unique(tb[,xaxis[i]]))))
+            
+            Plot <- Plot +
+              # ggbarplot(tb, x="Genotype", y=List_var[i], fill="Genotype", add = "mean_se", 
+              # facet.by = xaxis[i], alpha=0.5) +
               geom_jitter(aes(x=Genotype, y=get(List_var[i])), col = "black", height = 0, width = .2, alpha=.6) +
-              stat_pvalue_manual(stat.test, label = "p", tip.length = 0.01, vjust=-0.5) +
+              # stat_pvalue_manual(stat.test, label = "p", tip.length = 0.01, vjust=-0.5) +
               scale_fill_viridis_d(label=labels) +
               scale_y_continuous(expand = c(0, 0)) +
-              coord_cartesian(ylim = c(0, max(tb[,List_var[i]]*1.1))) +
+              # coord_cartesian(ylim = c(0, max(tb[[List_var[i]]]*1.1))) +
+              coord_cartesian(ylim = c(0, max(tb[[List_var[i]]]) + length(unique(tb$Genotype)) * (length(unique(tb$Genotype))-1)/2 * (max(tb[[List_var[i]]]) - mean(tb[[List_var[i]]]))/6)) +
               xlab(xlab[i]) +
               ylab(List_label[i]) +
               facet_wrap(as.formula(paste0("~",xaxis[i])), strip.position = "bottom", nrow=1) +
@@ -587,7 +652,6 @@ server <- function(input, output, session) {
                     strip.placement = "outside",
                     strip.text = element_text(size=12, vjust = 2),
                     plot.margin = unit(c(.8,.8,.8,.8), "cm"))
-            
           } else if (str_detect(input$task, "fz")) { #fz
             tb1 <- tb1 %>% transform(Genotype = factor(Genotype, levels=sort(unique(tb$Genotype))))
             
@@ -598,141 +662,175 @@ server <- function(input, output, session) {
                 #   summarize(value = mean(get(List_var[i]))) %>%
                 #   ungroup() %>%
                 #   anova_test(value ~ Genotype)
-                Plot <- 
-                  ggline(tb1, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", alpha=0.7) +
-                  annotate("rect", xmin = 2, xmax = 2.5, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6) +
-                  annotate("rect", xmin = 4, xmax = 4.5, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6) +
-                  annotate("rect", xmin = 6, xmax = 6.5, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6) +
-                  stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
-                  stat_compare_means(aes(group = Genotype), label = "p.signif") +
-                  # annotate("text", x=1,y=60,label=paste(italic(P), "=", stat.test$p)) +
-                  # stat_compare_means(aes(group = Genotype), label = "p.signif") +
-                  scale_color_viridis_d(label=labels) +
-                  xlab(xlab[i]) +
-                  ylab(List_label[i]) +
-                  #theme_bw() +
-                  theme_classic() + 
-                  theme(text = element_text(size = 15),
-                        axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
-                        axis.title.x = element_text(size = 15),
-                        axis.text.y = element_text(size = 12),
-                        axis.text.x = element_text(size = 12),
-                        axis.line = element_line(size = 1),
-                        axis.ticks = element_line(size = 1),
-                        axis.ticks.length = unit(.3, "cm"),
-                        legend.text.align = 0,
-                        legend.title = element_blank(), 
-                        legend.text=element_text(size = 15), #,face="bold"
-                        panel.border = element_blank(),
-                        plot.margin = unit(c(.8,.8,.8,.8), "cm"))
+                if(nrow(tb1) != 0){
+                  Plot <- 
+                    ggline(tb1, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", alpha=0.7) +
+                    annotate("rect", xmin = 2, xmax = 2.5, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6) +
+                    annotate("rect", xmin = 4, xmax = 4.5, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6) +
+                    annotate("rect", xmin = 6, xmax = 6.5, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6) +
+                    stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
+                    stat_compare_means(aes(group = Genotype), label = "p.signif") +
+                    # annotate("text", x=1,y=60,label=paste(italic(P), "=", stat.test$p)) +
+                    # stat_compare_means(aes(group = Genotype), label = "p.signif") +
+                    scale_color_viridis_d(label=labels) +
+                    xlab(xlab[i]) +
+                    ylab(List_label[i]) +
+                    #theme_bw() +
+                    theme_classic() + 
+                    theme(text = element_text(size = 15),
+                          axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
+                          axis.title.x = element_text(size = 15),
+                          axis.text.y = element_text(size = 12),
+                          axis.text.x = element_text(size = 12),
+                          axis.line = element_line(size = 1),
+                          axis.ticks = element_line(size = 1),
+                          axis.ticks.length = unit(.3, "cm"),
+                          legend.text.align = 0,
+                          legend.title = element_blank(), 
+                          legend.text=element_text(size = 15), #,face="bold"
+                          panel.border = element_blank(),
+                          plot.margin = unit(c(.8,.8,.8,.8), "cm"))
+                }
               } else { #shock_distance
                 tb2 <- tb2 %>% transform(Genotype = factor(Genotype, levels=sort(unique(tb$Genotype))))
-                Plot <- 
-                  ggline(tb2, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", 
-                         facet.by = "FZ_Day1_Shock", alpha=0.7) +
-                  annotate("rect", xmin = 7, xmax = 15, ymin = -Inf, ymax = Inf,  fill = "#474a4d", alpha=.6) +
-                  stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
-                  # annotate("text", x=12, y=18, label=paste("P =", stat.test$p)) +
-                  scale_color_viridis_d(label=labels) +
-                  scale_x_discrete(breaks=seq(0, 6, by=1)) + 
-                  xlab(xlab[i]) +
-                  ylab(List_label[i]) +
-                  #theme_bw() +
-                  theme_classic() + 
-                  theme(text = element_text(size = 15),
-                        axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
-                        axis.title.x = element_text(size = 15),
-                        axis.text.y = element_text(size = 12),
-                        axis.text.x = element_text(size = 12),
-                        axis.line = element_line(size = 1),
-                        axis.ticks = element_line(size = 1),
-                        axis.ticks.length = unit(.3, "cm"),
-                        legend.text.align = 0,
-                        legend.title = element_blank(), 
-                        legend.text=element_text(size = 15), #,face="bold"
-                        panel.border = element_blank(),
-                        strip.background = element_blank(),
-                        plot.margin = unit(c(.8,.8,.8,.8), "cm"))
+                # NFAT_2nd do not have data
+                if(nrow(tb2) != 0){
+                  Plot <- ggline(tb2, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", 
+                                 facet.by = "FZ_Day1_Shock", alpha=0.7) +
+                    annotate("rect", xmin = 7, xmax = 15, ymin = -Inf, ymax = Inf,  fill = "#474a4d", alpha=.6) +
+                    stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
+                    # annotate("text", x=12, y=18, label=paste("P =", stat.test$p)) +
+                    scale_color_viridis_d(label=labels) +
+                    scale_x_discrete(breaks=seq(0, 6, by=1)) + 
+                    xlab(xlab[i]) +
+                    ylab(List_label[i]) +
+                    #theme_bw() +
+                    theme_classic() + 
+                    theme(text = element_text(size = 15),
+                          axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
+                          axis.title.x = element_text(size = 15),
+                          axis.text.y = element_text(size = 12),
+                          axis.text.x = element_text(size = 12),
+                          axis.line = element_line(size = 1),
+                          axis.ticks = element_line(size = 1),
+                          axis.ticks.length = unit(.3, "cm"),
+                          legend.text.align = 0,
+                          legend.title = element_blank(), 
+                          legend.text=element_text(size = 15), #,face="bold"
+                          panel.border = element_blank(),
+                          strip.background = element_blank(),
+                          plot.margin = unit(c(.8,.8,.8,.8), "cm"))
+                }
               }
             } else { #day2 & 3
               if(i==1 | i==3){#context
                 tb1 <- tb1 %>%
-                  dplyr::filter(get(paste0(prefix,"_Experiment")) == "Context")
+                  dplyr::filter(get(paste0(prefix,"_Experiment")) == "Context") %>%
+                  dplyr::select(MouseID, Genotype, paste0(prefix,"_Experiment"), paste0(prefix,"_Time"), List_var[i]) %>%
+                  na.omit()
                 
-                Plot <- 
-                  ggline(tb1, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", alpha=0.7) +
-                  stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
-                  stat_compare_means(aes(group = Genotype), label = "p.signif") +
-                  # annotate("text", x=12, y=18, label=paste("P =", stat.test$p)) +
-                  scale_color_viridis_d(label=labels) +
-                  scale_x_discrete(breaks=seq(0, 5, by=1)) + 
-                  xlab(xlab) +
-                  ylab(List_label[i]) +
-                  #theme_bw() +
-                  theme_classic() + 
-                  theme(text = element_text(size = 15),
-                        axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
-                        axis.title.x = element_text(size = 15),
-                        axis.text.y = element_text(size = 12),
-                        axis.text.x = element_text(size = 12),
-                        axis.line = element_line(size = 1),
-                        axis.ticks = element_line(size = 1),
-                        axis.ticks.length = unit(.3, "cm"),
-                        legend.text.align = 0,
-                        legend.title = element_blank(), 
-                        legend.text=element_text(size = 15), #,face="bold"
-                        panel.border = element_blank(),
-                        strip.background = element_blank(),
-                        plot.margin = unit(c(.8,.8,.8,.8), "cm"))
+                if(nrow(tb1) != 0){
+                  Plot <- 
+                    ggline(tb1, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", alpha=0.7) +
+                    stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
+                    stat_compare_means(aes(group = Genotype), label = "p.signif") +
+                    # annotate("text", x=12, y=18, label=paste("P =", stat.test$p)) +
+                    scale_color_viridis_d(label=labels) +
+                    scale_x_discrete(breaks=seq(0, max(tb1[[xaxis]], na.rm=TRUE), by=1)) + 
+                    xlab(xlab) +
+                    ylab(List_label[i]) +
+                    #theme_bw() +
+                    theme_classic() + 
+                    theme(text = element_text(size = 15),
+                          axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
+                          axis.title.x = element_text(size = 15),
+                          axis.text.y = element_text(size = 12),
+                          axis.text.x = element_text(size = 12),
+                          axis.line = element_line(size = 1),
+                          axis.ticks = element_line(size = 1),
+                          axis.ticks.length = unit(.3, "cm"),
+                          legend.text.align = 0,
+                          legend.title = element_blank(), 
+                          legend.text=element_text(size = 15), #,face="bold"
+                          panel.border = element_blank(),
+                          strip.background = element_blank(),
+                          plot.margin = unit(c(.8,.8,.8,.8), "cm"))
+                }
               } else { #cued
                 tb1 <- tb1 %>%
-                  dplyr::filter(get(paste0(prefix,"_Experiment")) == "Cued")
+                  dplyr::filter(get(paste0(prefix,"_Experiment")) == "Cued") %>%
+                  dplyr::select(MouseID, Genotype, paste0(prefix,"_Experiment"), paste0(prefix,"_Time"), List_var[i]) %>%
+                  na.omit()
                 
-                Plot <- 
-                  ggline(tb1, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", alpha=0.7) +
-                  annotate("rect", xmin = 3, xmax = 6, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=0.6) +
-                  stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
-                  stat_compare_means(aes(group = Genotype), label = "p.signif") +
-                  # annotate("text", x=12, y=18, label=paste("P =", stat.test$p)) +
-                  scale_color_viridis_d(label=labels) +
-                  scale_x_discrete(breaks=seq(0, 6, by=1)) + 
-                  xlab(xlab) +
-                  ylab(List_label[i]) +
-                  #theme_bw() +
-                  theme_classic() + 
-                  theme(text = element_text(size = 15),
-                        axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
-                        axis.title.x = element_text(size = 15),
-                        axis.text.y = element_text(size = 12),
-                        axis.text.x = element_text(size = 12),
-                        axis.line = element_line(size = 1),
-                        axis.ticks = element_line(size = 1),
-                        axis.ticks.length = unit(.3, "cm"),
-                        legend.text.align = 0,
-                        legend.title = element_blank(), 
-                        legend.text=element_text(size = 15), #,face="bold"
-                        panel.border = element_blank(),
-                        strip.background = element_blank(),
-                        plot.margin = unit(c(.8,.8,.8,.8), "cm"))
+                if(nrow(tb1) != 0){
+                  Plot <- 
+                    ggline(tb1, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", alpha=0.7) +
+                    annotate("rect", xmin = 3, xmax = 6, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=0.6) +
+                    stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
+                    stat_compare_means(aes(group = Genotype), label = "p.signif") +
+                    # annotate("text", x=12, y=18, label=paste("P =", stat.test$p)) +
+                    scale_color_viridis_d(label=labels) +
+                    scale_x_discrete(breaks=seq(0, 6, by=1)) + 
+                    xlab(xlab) +
+                    ylab(List_label[i]) +
+                    #theme_bw() +
+                    theme_classic() + 
+                    theme(text = element_text(size = 15),
+                          axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
+                          axis.title.x = element_text(size = 15),
+                          axis.text.y = element_text(size = 12),
+                          axis.text.x = element_text(size = 12),
+                          axis.line = element_line(size = 1),
+                          axis.ticks = element_line(size = 1),
+                          axis.ticks.length = unit(.3, "cm"),
+                          legend.text.align = 0,
+                          legend.title = element_blank(), 
+                          legend.text=element_text(size = 15), #,face="bold"
+                          panel.border = element_blank(),
+                          strip.background = element_blank(),
+                          plot.margin = unit(c(.8,.8,.8,.8), "cm"))
+                }
               }
               
             }
             
           } else if (input$task == "hc") {
-            stat.test <- tb %>%
-              group_by_("MouseID","Genotype") %>%
-              summarize_(.dots = setNames(paste0('mean(', List_var[i], ')'), List_var[i])) %>%
-              ungroup() %>%
-              t_test(as.formula(paste0(List_var[i], "~Genotype")))
-            stat.test$x.position <- max(tb[,xaxis],na.rm=TRUE)*0.8
-            stat.test$y.position <- max(tb[,List_var[i]],na.rm=TRUE)
-            
             xminli <- c(0, seq((max(tb$HC_Time, na.rm = T)-1) %/% 24)) * 24 + 1
             xmaxli <- c(0, seq((max(tb$HC_Time, na.rm = T)-1) %/% 24)) * 24 + 12
-            Plot <- 
-              ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", alpha=0.7) +
-              annotate("rect", xmin = xminli, xmax = xmaxli, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6) +
-              annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
+            if (length(unique(tb$Genotype)) > 1 & length(unique(tb[[List_var[i]]])) > 1){ # filter out data with no variation in values
+              if(length(unique(tb$Genotype)) > 2){
+                stat.test <- tb %>%
+                  filter(Genotype %in% comp_gen_list) %>% # filter out group with only 1 sample when testing
+                  # group_by_("MouseID","Genotype") %>%
+                  # summarize_(.dots = setNames(paste0('mean(', List_var[i], ')'), List_var[i])) %>%
+                  # ungroup() #%>%
+                  anova_test(dv=List_var[i], wid="MouseID", within=xaxis, between="Genotype")
+              }else{
+                stat.test <- tb %>%
+                  filter(Genotype %in% comp_gen_list) %>% # filter out group with only 1 sample when testing
+                  # group_by_("MouseID","Genotype") %>%
+                  # summarize_(.dots = setNames(paste0('mean(', List_var[i], ')'), List_var[i])) %>%
+                  # ungroup() #%>%
+                  t_test(as.formula(paste0(List_var[i], "~Genotype")))
+              }
+              if(class(stat.test)[2] == "list"){
+                stat.test <- stat.test$ANOVA
+              }
+              stat.test <- head(stat.test, n=1)
+              stat.test$x.position <- max(tb[[xaxis]],na.rm=TRUE)*0.8
+              stat.test$y.position <- max(tb[[List_var[i]]],na.rm=TRUE)
+              Plot <- ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", alpha=0.7) +
+                annotate("rect", xmin = xminli, xmax = xmaxli, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6) +
+                annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), 
+                         x =  stat.test$x.position, y = stat.test$y.position, size=4)
+            } else {
+              Plot <- ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", alpha=0.7) +
+                annotate("rect", xmin = xminli, xmax = xmaxli, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6)
+            }
+            Plot <- Plot +
+              # ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", alpha=0.7) +
+              # annotate("rect", xmin = xminli, xmax = xmaxli, ymin = -Inf, ymax = Inf,  fill = "lightgrey", alpha=.6) +
+              # annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
               stat_summary(aes(group=Genotype, color=Genotype), fun=mean, geom="line", size=1) + 
               # annotate("text", x=1,y=60,label=paste(italic(P), "=", stat.test$p)) +
               # stat_compare_means(aes(group = Genotype), label = "p.signif") +
@@ -759,24 +857,31 @@ server <- function(input, output, session) {
             if(i < 3){
               tb1 <- dplyr::select(tb, c("MouseID","Genotype",paste0(prefix,c("_SubID","_Type","_Experiment")),xaxis[i],List_var[i])) %>%
                 dplyr::filter(CrSoc_Experiment == "Sociability test")
-            } else{
+            } else {
               tb1 <- dplyr::select(tb, c("MouseID","Genotype",paste0(prefix,c("_SubID","_Type","_Experiment")),xaxis[i],List_var[i])) %>%
                 dplyr::filter(CrSoc_Experiment == "Preference test")
             }
             if(xaxis[i] == "Genotype"){
               tb1 <- dplyr::select(tb1, !c(paste0(prefix,c("_Type","_Experiment")))) %>%
                 distinct()
-              stat.test <- tb1 %>%
-                t_test(as.formula(paste0(List_var[i], "~", xaxis[i])))
-              stat.test$y.position <- c(seq(max(tb1[,List_var[i]])*0.9, max(tb1[,List_var[i]])*1.1, by=max(tb1[,List_var[i]])/20)[1:1])
-              
-              Plot <- 
-                ggbarplot(tb1, x="Genotype", y=List_var[i], fill=xaxis[i], alpha=0.8, add = "mean_se") +
+              if (length(unique(tb$Genotype)) > 1 & length(unique(tb[[List_var[i]]])) > 1){ # filter out data with no variation in values
+                stat.test <- tb1 %>%
+                  filter(Genotype %in% comp_gen_list) %>% # filter out group with only 1 sample when testing
+                  t_test(as.formula(paste0(List_var[i], "~", xaxis[i]))) %>%
+                  add_xy_position(x = "Genotype")
+                # stat.test$y.position <- c(seq(max(tb1[[List_var[i]]])*0.9, max(tb1[[List_var[i]]])*1.1, by=max(tb1[[List_var[i]]])/20)[1:1])
+                Plot <- ggbarplot(tb1, x="Genotype", y=List_var[i], fill=xaxis[i], alpha=0.8, add = "mean_se") +
+                  stat_pvalue_manual(stat.test, label = "p", tip.length = 0.01, vjust=-0.5) +
+                  coord_cartesian(ylim = c(0, max(tb[[List_var[i]]]) + length(unique(tb$Genotype)) * (length(unique(tb$Genotype))-1)/2 * (max(tb[[List_var[i]]]) - mean(tb[[List_var[i]]]))/6))
+              } else {
+                Plot <- ggbarplot(tb1, x="Genotype", y=List_var[i], fill=xaxis[i], alpha=0.8, add = "mean_se") +
+                  coord_cartesian(ylim = c(0, NA))
+              }
+              Plot <- Plot +
                 geom_jitter(aes(x=get(xaxis[i]), y=get(List_var[i])), col = "black", height = 0, width = .2, alpha=.6) +
-                stat_pvalue_manual(stat.test, label = "p", tip.length = 0.01, vjust=-0.5) +
                 scale_fill_viridis_d(label=labels) +
                 scale_y_continuous(expand = c(0, 0)) +
-                coord_cartesian(ylim = c(0, max(tb1[,List_var[i]]*1.1))) +
+                # coord_cartesian(ylim = c(0, max(tb1[[List_var[i]]]*1.1))) +
                 ylab(List_label[i]) +
                 #theme_bw() +
                 theme_classic() + 
@@ -795,26 +900,29 @@ server <- function(input, output, session) {
                       panel.border = element_blank(),
                       plot.margin = unit(c(.8,.8,.8,.8), "cm"))
             } else {
-              # tb1 <- tb1 %>% dplyr::mutate(!!xaxis[i] := factor(get(xaxis[i]), levels=sort(unique(tb1[[xaxis[i]]]))))
-              tb1 <- transform(tb1, CrSoc_Place = factor(CrSoc_Place, levels = sort(unique(tb1[[xaxis[i]]]))))
-              
-              stat.test <- tb1 %>%
-                group_by(Genotype) %>%
-                t_test(as.formula(paste0(List_var[i], "~", xaxis[i])), paired = T)
-              stat.test$y.position <- c(rep(seq(max(tb1[,List_var[i]])*0.9, max(tb1[,List_var[i]])*1.1, by=max(tb1[,List_var[i]])/20)[1:1],length(unique(tb1[,xaxis[i]]))))
-              
-              Plot <- 
-                ggbarplot(tb1, x=xaxis[i], y=List_var[i], fill="Genotype", add = "mean_se", alpha=xaxis[i], facet.by = "Genotype") +
+              if (length(unique(tb$Genotype)) > 1 & length(unique(tb[[List_var[i]]])) > 1){
+                tb1 <- transform(tb1, CrSoc_Place = factor(CrSoc_Place, levels = sort(unique(tb1[[xaxis[i]]]))))
+                stat.test <- tb1 %>%
+                  filter(Genotype %in% comp_gen_list) %>% # filter out group with only 1 sample when testing
+                  group_by(Genotype) %>%
+                  t_test(as.formula(paste0(List_var[i], "~", xaxis[i])), paired = T)
+                stat.test$y.position <- c(rep(seq(max(tb1[[List_var[i]]])*0.9, max(tb1[[List_var[i]]])*1.1, by=max(tb1[[List_var[i]]])/20)[1],length(unique(stat.test$Genotype))))
+                Plot <-
+                  ggbarplot(tb1, x=xaxis[i], y=List_var[i], fill="Genotype", add = "mean_se", alpha=xaxis[i], facet.by = "Genotype") +
+                  stat_pvalue_manual(stat.test, label = "p", tip.length = 0.01, vjust=-0.5)
+              } else {
+                Plot <-
+                  ggbarplot(tb1, x=xaxis[i], y=List_var[i], fill="Genotype", add = "mean_se", alpha=xaxis[i])
+              }
+              Plot <- Plot +
                 geom_jitter(aes(x=get(xaxis[i]), y=get(List_var[i])), col = "black", height = 0, width = 0, alpha=.6) +
                 geom_line(aes(x=get(xaxis[i]), y=get(List_var[i]), group=MouseID), size=.5, alpha=.5) +
-                stat_pvalue_manual(stat.test, label = "p", tip.length = 0.01, vjust=-0.5) +
+                # stat_pvalue_manual(stat.test, label = "p", tip.length = 0.01, vjust=-0.5) +
                 scale_fill_viridis_d(labels=labels) +
                 scale_alpha_manual(values=c(0.3,0.9), labels=sort(unique(tb1[[xaxis[i]]]))) +
                 scale_y_continuous(expand = c(0, 0)) +
-                coord_cartesian(ylim = c(0, max(tb1[,List_var[i]])*1.1)) +
+                coord_cartesian(ylim = c(0, max(tb1[[List_var[i]]])*1.1)) +
                 ylab(List_label[i]) +
-                # facet_wrap(~Genotype, strip.position = "bottom", nrow=1) +
-                #theme_bw() +
                 theme_classic() + 
                 theme(text = element_text(size = 15),
                       axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 15, b = 0, l = 0)),
@@ -836,27 +944,50 @@ server <- function(input, output, session) {
                 guides(alpha = "none")
             }
           } else {
-            
-            stat.test <- tb %>%
-              anova_test(dv=List_var[i], wid="MouseID", within=xaxis, between="Genotype")
+            # print(group)
+            if (length(unique(tb$Genotype)) > 1 & length(unique(tb[[List_var[i]]])) > 1){ # filter out data with no variation in values
+              stat.test <- tb %>%
+                anova_test(dv=List_var[i], wid="MouseID", within=xaxis, between="Genotype")
+              if(class(stat.test)[2] == "list"){
+                stat.test <- stat.test$ANOVA
+              }
+              stat.test <- head(stat.test, n=1)
+              stat.test$x.position <- max(tb[[xaxis]],na.rm=TRUE)*0.75
+              stat.test$y.position <- (mean(tb[[List_var[i]]],na.rm=TRUE) + 2 * sd(tb[[List_var[i]]],na.rm=TRUE))
+              if(input$task == "of"){
+                tb <- tb %>%
+                  dplyr::select(-c(OF_SUM_Drug,OF_SUM_Notes,OF_SUM_EquipmentNumber)) %>%
+                  na.omit()
+                Plot <- ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
+                  annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4)
+              } else {
+                Plot <- ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
+                  annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4)
+              }
+            } else {
+              Plot <- ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE)
+            }
+            # stat.test <- tb %>%
+            # anova_test(dv=List_var[i], wid="MouseID", within=xaxis, between="Genotype")
             # group_by_("MouseID","Genotype") %>%
             # summarize_(.dots = setNames(paste0('mean(', List_var[i], ')'), List_var[i])) %>%
             # ungroup() %>%
             # t_test(as.formula(paste0(List_var[i], "~Genotype")))
-            if(class(stat.test)[2] == "list"){
-              stat.test <- stat.test$ANOVA
-            }
-            stat.test <- head(stat.test, n=1)
-            stat.test$x.position <- max(tb[,xaxis],na.rm=TRUE)*0.7
-            stat.test$y.position <- max(tb[,List_var[i]],na.rm=TRUE)*0.85
+            # if(length(unique(tb$Genotype)) > 1 & class(stat.test)[2] == "list"){
+            #   stat.test <- stat.test$ANOVA
+            # }
+            # stat.test <- head(stat.test, n=1)
+            # stat.test$x.position <- max(tb[[xaxis]],na.rm=TRUE)*0.7
+            # stat.test$y.position <- max(tb[[List_var[i]]],na.rm=TRUE)*0.85
             
             if (input$task == "of"){
-              Plot <- 
-                ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
-                annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
+              Plot <- Plot +
+                 #ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
+                 #annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
                 scale_color_viridis_d(label=labels) +
-                scale_x_continuous(limits = c(NA,max(tb[,xaxis],na.rm=TRUE)),
-                                   breaks = seq(max(tb[,xaxis],na.rm=TRUE) %% 2, max(tb[,xaxis],na.rm=TRUE), by = as.integer(max(tb[,xaxis],na.rm=TRUE)/6))) + #24->6
+                 scale_x_continuous(limits = c(NA,max(tb[[xaxis]],na.rm=TRUE)),
+                                   breaks = seq(max(tb[[xaxis]],na.rm=TRUE) %% 2, max(tb[[xaxis]],na.rm=TRUE), by = as.integer(max(tb[[xaxis]],na.rm=TRUE)/6))) + #24->6              
+                coord_cartesian(ylim = c(NA, (mean(tb[[List_var[i]]],na.rm=TRUE) + 3 * sd(tb[[List_var[i]]],na.rm=TRUE)))) +
                 xlab(xlab) +
                 ylab(List_label[i]) +
                 theme_classic() + 
@@ -874,12 +1005,25 @@ server <- function(input, output, session) {
                       panel.border = element_blank(),
                       plot.margin = unit(c(.8,.8,.8,.8), "cm"))
             } else{
-              Plot <- 
-                ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
-                annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
+              Plot <- Plot +
+                # ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
+                # annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
                 scale_color_viridis_d(label=labels) +
-                scale_x_continuous(limits = c(NA,max(tb[,xaxis],na.rm=TRUE)),
-                breaks = seq(max(tb[,xaxis],na.rm=TRUE) %% 2, max(tb[,xaxis],na.rm=TRUE), by = as.integer(max(tb[,xaxis],na.rm=TRUE)/5))) + #6->5
+                scale_x_continuous(limits = c(NA,max(tb[[xaxis]],na.rm=TRUE)),
+                                   breaks = if(max(tb[[xaxis]],na.rm=TRUE) > 10){
+                                     c(1, seq(
+                                       if_else(max(tb[[xaxis]],na.rm=TRUE) %% 5 == 0, 5, 4), 
+                                       as.integer(max(tb[[xaxis]],na.rm=TRUE)), 
+                                       by=if_else(max(tb[[xaxis]],na.rm=TRUE) %% 5 == 0, #max(tb[[xaxis]],na.rm=TRUE) %% 3 == 0, 
+                                                  5, #max(tb[[xaxis]],na.rm=TRUE)/3, 
+                                                  3 )))#max(tb[[xaxis]],na.rm=TRUE)/4)))
+                                   }else(
+                                     seq(1, max(tb[[xaxis]],na.rm=TRUE), by=1)
+                                   )) +
+                #   c(1, if_else(
+                #   max(tb[[xaxis]],na.rm=TRUE) > 10, if_else(max(tb[[xaxis]],na.rm=TRUE) %% 5 == 0, 5, 4), 2
+                # )seq(if_else(max(tb[[xaxis]],na.rm=TRUE) %% 5 == 0, 5, 4), max(tb[[xaxis]],na.rm=TRUE), by = if_else(max(tb[[xaxis]],na.rm=TRUE) %% 3 == 0, max(tb[[xaxis]],na.rm=TRUE)/3, max(tb[[xaxis]],na.rm=TRUE)/4)))) + #6->5
+                coord_cartesian(ylim = c(NA, (mean(tb[[List_var[i]]],na.rm=TRUE) + 3 * sd(tb[[List_var[i]]],na.rm=TRUE)))) +
                 xlab(xlab) +
                 ylab(List_label[i]) +
                 theme_classic() + 
@@ -899,16 +1043,19 @@ server <- function(input, output, session) {
             }
           }
         })
-        
       }
-      
-      
     }
     
-    ggarrange(plotlist = myplots,
-              ncol = nc, nrow = nr, 
-              common.legend = TRUE, legend = "bottom")
+    plot <- ggarrange(plotlist = myplots,
+                      ncol = nc, nrow = nr, 
+                      common.legend = TRUE, legend = "bottom")
+    return(plot)
     
+  })
+  
+  output$plot <- renderPlot({
+    
+    mkplot()
     
   })
   
@@ -937,60 +1084,62 @@ server <- function(input, output, session) {
                  updateSelectizeInput(session, input = "task",
                                       choices = choices_idx())
                })
+
+
 }
-
+  
 ####ui####
-
+  
 ui <- fluidPage(
-  titlePanel("Mouse Phenotype Database App"),
-  
-  
-  
-  #consider put one download button in each panel
-  
-  mainPanel(
-    tabsetPanel(
-      #tabPanel("Instructions", HTML("Get well soon, Nozomu!")),
-      tabPanel("Strain Summary",downloadLink("downloadStrains", "Download"),
-               dataTableOutput("table_strain")),
-      
-      tabPanel("Tables and Plots",
-               
-               sidebarLayout(
-                 sidebarPanel(      
-                   selectInput("group", "Enter group", choices = sort(group_choices)),
-                   
-                   selectInput(
-                     "task",
-                     label = "Enter task",
-                     # We can initialize this as NULL because
-                     # we will update in the server function.
-                     choices = NULL,
-                     # multiple = TRUE
-                   ),
-                   
-                   
-                   
-                   selectInput("tableorplot", "Enter Table or Plot", choices = c("Table","Plot")),
-                   #bsTooltip(id = "tableorplot", 
-                   #    title = "Please select"),
-                   
-                   downloadLink("downloadData", "Download Table"),
-                   bsTooltip(id = "downloadData", #for some reason, this does not work
-                             title = "If a download window pops up, please specify the name of the file
-                             with the .xlsx extension.")), 
-                 
-                 mainPanel(
-                   conditionalPanel(condition="input.tableorplot == 'Table'",
-                                    dataTableOutput("table")),
-                   conditionalPanel(condition="input.tableorplot == 'Plot'",
-                                    plotOutput("plot", width = "700px", height = "700px"))
-                 )
-                 
-               )),
-      tabPanel("About", HTML("
+    titlePanel("Mouse Phenotype Database App"),
+    
+    
+    
+    #consider put one download button in each panel
+    
+    mainPanel(
+      tabsetPanel(
+        #tabPanel("Instructions", HTML("Get well soon, Nozomu!")),
+        tabPanel("Strain Summary",downloadLink("downloadStrains", "Download"),
+                 dataTableOutput("table_strain")),
         
-      Version 0.2 (2021/10/6 of the <b>Mouse Phenotype Database App</b><br/>
+        tabPanel("Tables and Plots",
+                 
+                 sidebarLayout(
+                   sidebarPanel(      
+                     selectInput("group", "Enter group", choices = sort(group_choices)),
+                     
+                     selectInput(
+                       "task",
+                       label = "Enter task",
+                       # We can initialize this as NULL because
+                       # we will update in the server function.
+                       choices = NULL,
+                       # multiple = TRUE
+                     ),
+                     
+                     
+                     
+                     selectInput("tableorplot", "Enter Table or Plot", choices = c("Table","Plot")),
+                     #bsTooltip(id = "tableorplot", 
+                     #    title = "Please select"),
+                     
+                     downloadLink("downloadData", "Download Table"),
+                     bsTooltip(id = "downloadData", #for some reason, this does not work
+                               title = "If a download window pops up, please specify the name of the file
+                             with the .xlsx extension.")), 
+                   
+                   mainPanel(
+                     conditionalPanel(condition="input.tableorplot == 'Table'",
+                                      dataTableOutput("table")),
+                     conditionalPanel(condition="input.tableorplot == 'Plot'",
+                                      plotOutput("plot", width = "700px", height = "700px"))
+                   )
+                   
+                 )),
+        tabPanel("About", HTML("
+        
+      Version 0.2 (2021/10/21 of the <b>Mouse Phenotype Database App</b><br/>
       by <i>Giovanni Sala</i> (Fujita University, University of Liverpool)<br/>
       and <i>Daiki Sato</i> (Chiba University).<br/>
       Maintainer: Giovanni Sala (sala.giovanni475@gmail.com)<br/>
@@ -1002,11 +1151,12 @@ ui <- fluidPage(
       click on <a href='http://www.mouse-phenotype.org/'>this link</a>.
       
 							"))
-    )))
-
-
-
+      )))
+  
+  
+  
+  
 
 ####Run####
-
+  
 shinyApp(ui = ui, server = server)
