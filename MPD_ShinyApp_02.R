@@ -1054,8 +1054,13 @@ server <- function(input, output, session) {
   })
   
   output$plot <- renderPlot({
-    
-    mkplot()
+	  
+	  if (input$goButton == 0)
+		  return()
+	  
+	  isolate({
+		  mkplot()
+	  })
     
   })
   
@@ -1123,6 +1128,9 @@ ui <- fluidPage(
                      selectInput("tableorplot", "Enter Table or Plot", choices = c("Table","Plot")),
                      #bsTooltip(id = "tableorplot", 
                      #    title = "Please select"),
+		     
+		     actionButton("goButton", "View plot"),
+
                      
                      downloadLink("downloadData", "Download Table"),
                      bsTooltip(id = "downloadData", #for some reason, this does not work
