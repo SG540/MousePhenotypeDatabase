@@ -186,7 +186,11 @@ server <- function(input, output, session) {
   
   #tables
   output$table <- renderDataTable({
-    datasetInput()
+	  if (input$goButton == 0) 
+		  return()
+	  isolate({
+		  datasetInput()
+		  })
     
   })
   
@@ -1120,7 +1124,7 @@ ui <- fluidPage(
                      #bsTooltip(id = "tableorplot", 
                      #    title = "Please select"),
 		     
-		     actionButton("goButton", "View plot"),
+		     actionButton("goButton", "Show Table or Plot"),
 
                      
                      downloadLink("downloadData", "Download Table"),
