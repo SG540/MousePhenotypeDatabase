@@ -30,20 +30,11 @@ library(slider)
 
 ####connection####
 
-connection <- tryCatch({dbConnect(odbc::odbc(),
+connection <- dbConnect(odbc::odbc(),
                                   Driver = "MySQL", 
                                   Server="204.2.195.88", Database="mouse_phenotype_database",
                                   UID = "guest_mpd_app",
-                                  PWD="fuffu_2021_!?_sambapati", Port=17703)},
-                                             
-                       error = function(e)
-                         
-                       {dbConnect(odbc::odbc(),
-                                  .connection_string = "Driver={MySQL ODBC 8.0 Unicode Driver};",
-                                  Server="204.2.195.88", Database="mouse_phenotype_database",
-                                  UID = "guest_mpd_app",
-                                  PWD="fuffu_2021_!?_sambapati", Port=17703)})
-
+                                  PWD="fuffu_2021_!?_sambapati", Port=17703)
 
 
 ####Choices and Tasks####
