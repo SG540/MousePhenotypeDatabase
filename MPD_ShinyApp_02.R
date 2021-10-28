@@ -35,15 +35,15 @@ connection <- tryCatch({dbConnect(odbc::odbc(),
                                   Server="204.2.195.88", Database="mouse_phenotype_database",
                                   UID = "guest_mpd_app",
                                   PWD="fuffu_2021_!?_sambapati", Port=17703)},
-                       
+                                             
                        error = function(e)
-                         
                          
                        {dbConnect(odbc::odbc(),
                                   .connection_string = "Driver={MySQL ODBC 8.0 Unicode Driver};",
                                   Server="204.2.195.88", Database="mouse_phenotype_database",
                                   UID = "guest_mpd_app",
                                   PWD="fuffu_2021_!?_sambapati", Port=17703)})
+
 
 
 ####Choices and Tasks####
@@ -982,10 +982,10 @@ server <- function(input, output, session) {
             
             if (input$task == "of"){
               Plot <- Plot +
-                 #ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
-                 #annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
+                #ggline(tb, x=xaxis, y=List_var[i], color="Genotype", add = "mean_se", numeric.x.axis = TRUE) +
+                #annotate("text", label=paste(expression("Repeated measures ANOVA, \nP ="), stat.test$p), x =  stat.test$x.position, y = stat.test$y.position, size=4) +
                 scale_color_viridis_d(label=labels) +
-                 scale_x_continuous(limits = c(NA,max(tb[[xaxis]],na.rm=TRUE)),
+                scale_x_continuous(limits = c(NA,max(tb[[xaxis]],na.rm=TRUE)),
                                    breaks = seq(max(tb[[xaxis]],na.rm=TRUE) %% 2, max(tb[[xaxis]],na.rm=TRUE), by = as.integer(max(tb[[xaxis]],na.rm=TRUE)/6))) + #24->6              
                 coord_cartesian(ylim = c(NA, (mean(tb[[List_var[i]]],na.rm=TRUE) + 3 * sd(tb[[List_var[i]]],na.rm=TRUE)))) +
                 xlab(xlab) +
@@ -1084,60 +1084,60 @@ server <- function(input, output, session) {
                  updateSelectizeInput(session, input = "task",
                                       choices = choices_idx())
                })
-
-
+  
+  
 }
-  
+
 ####ui####
-  
+
 ui <- fluidPage(
-    titlePanel("Mouse Phenotype Database App"),
-    
-    
-    
-    #consider put one download button in each panel
-    
-    mainPanel(
-      tabsetPanel(
-        #tabPanel("Instructions", HTML("Get well soon, Nozomu!")),
-        tabPanel("Strain Summary",downloadLink("downloadStrains", "Download"),
-                 dataTableOutput("table_strain")),
-        
-        tabPanel("Tables and Plots",
-                 
-                 sidebarLayout(
-                   sidebarPanel(      
-                     selectInput("group", "Enter group", choices = sort(group_choices)),
-                     
-                     selectInput(
-                       "task",
-                       label = "Enter task",
-                       # We can initialize this as NULL because
-                       # we will update in the server function.
-                       choices = NULL,
-                       # multiple = TRUE
-                     ),
-                     
-                     
-                     
-                     selectInput("tableorplot", "Enter Table or Plot", choices = c("Table","Plot")),
-                     #bsTooltip(id = "tableorplot", 
-                     #    title = "Please select"),
-                     
-                     downloadLink("downloadData", "Download Table"),
-                     bsTooltip(id = "downloadData", #for some reason, this does not work
-                               title = "If a download window pops up, please specify the name of the file
+  titlePanel("Mouse Phenotype Database App"),
+  
+  
+  
+  #consider put one download button in each panel
+  
+  mainPanel(
+    tabsetPanel(
+      #tabPanel("Instructions", HTML("Get well soon, Nozomu!")),
+      tabPanel("Strain Summary",downloadLink("downloadStrains", "Download"),
+               dataTableOutput("table_strain")),
+      
+      tabPanel("Tables and Plots",
+               
+               sidebarLayout(
+                 sidebarPanel(      
+                   selectInput("group", "Enter group", choices = sort(group_choices)),
+                   
+                   selectInput(
+                     "task",
+                     label = "Enter task",
+                     # We can initialize this as NULL because
+                     # we will update in the server function.
+                     choices = NULL,
+                     # multiple = TRUE
+                   ),
+                   
+                   
+                   
+                   selectInput("tableorplot", "Enter Table or Plot", choices = c("Table","Plot")),
+                   #bsTooltip(id = "tableorplot", 
+                   #    title = "Please select"),
+                   
+                   downloadLink("downloadData", "Download Table"),
+                   bsTooltip(id = "downloadData", #for some reason, this does not work
+                             title = "If a download window pops up, please specify the name of the file
                              with the .xlsx extension.")), 
-                   
-                   mainPanel(
-                     conditionalPanel(condition="input.tableorplot == 'Table'",
-                                      dataTableOutput("table")),
-                     conditionalPanel(condition="input.tableorplot == 'Plot'",
-                                      plotOutput("plot", width = "700px", height = "700px"))
-                   )
-                   
-                 )),
-        tabPanel("About", HTML("
+                 
+                 mainPanel(
+                   conditionalPanel(condition="input.tableorplot == 'Table'",
+                                    dataTableOutput("table")),
+                   conditionalPanel(condition="input.tableorplot == 'Plot'",
+                                    plotOutput("plot", width = "700px", height = "700px"))
+                 )
+                 
+               )),
+      tabPanel("About", HTML("
         
       Version 0.2 (2021/10/21 of the <b>Mouse Phenotype Database App</b><br/>
       by <i>Giovanni Sala</i> (Fujita University, University of Liverpool)<br/>
@@ -1151,12 +1151,12 @@ ui <- fluidPage(
       click on <a href='http://www.mouse-phenotype.org/'>this link</a>.
       
 							"))
-      )))
-  
-  
-  
-  
+    )))
+
+
+
+
 
 ####Run####
-  
+
 shinyApp(ui = ui, server = server)
