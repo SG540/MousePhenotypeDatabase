@@ -383,7 +383,25 @@ server <- function(input, output, session) {
                       OF_VerAct = slide_vec(.x = OF_VerAct, .f = mean, .before = 4),
                       OF_StCounts = slide_vec(.x = OF_StCounts, .f = mean, .before = 4)) %>%
         dplyr::filter(OF_Time %% 5 == 0)
-    } else if (input$task == "bm_t01"){
+    } else if (task == "hc"){
+      tb_tmp <- dplyr::filter(tb, HC_Time <= 168) %>%
+        mutate(Time7 = if_else(HC_HourRecorded == 7, HC_Time, 10000)) %>%
+        group_by(HC_TrialID, HC_SUM_ID, MouseID, Genotype, Gender, GroupID) %>%
+        dplyr::summarize(Time7 = 25 - min(Time7))
+      tb_hc_list <- tb_tmp$Time7
+      names(tb_hc_list) = tb_tmp$HC_TrialID
+
+      tb1 <- tb %>%
+        mutate(HC_Time = HC_Time + tb_hc_list[HC_TrialID])
+      tb <- tb_tmp %>%
+        group_by(HC_TrialID, HC_SUM_ID, MouseID, Genotype, Gender, GroupID) %>%
+        nest() %>% 
+        mutate(HC_Time = map2(data, HC_TrialID, ~ seq(1, .x$Time7))) %>%
+        unnest(c(data, HC_Time)) %>%
+        dplyr::select(-Time7) %>%
+        bind_rows(tb1)
+    
+  } else if (input$task == "bm_t01"){
       tb <- dplyr::filter(tb, BM_Time <= 15)
     } else if (input$task == "bm_probe"){
       tb <- dplyr::filter(tb, str_detect(BM_probe_SubTrialNumber, "PT"))# %>%
@@ -790,24 +808,24 @@ server <- function(input, output, session) {
             }
             
           } else if (input$task == "hc") {
-            xminli <- c(0, seq((max(tb$HC_Time, na.rm = T)-1) %/% 24)) * 24 + 1
-            xmaxli <- c(0, seq((max(tb$HC_Time, na.rm = T)-1) %/% 24)) * 24 + 12
+            xminli <- c(0, seq((max(tb$HC_Time, na.rm = T)-25) %/% 24)) * 24 + 13
+            xmaxli <- c(0, seq((max(tb$HC_Time, na.rm = T)-25) %/% 24)) * 24 + 25
             if (length(unique(tb$Genotype)) > 1 & length(unique(tb[[List_var[i]]])) > 1){ # filter out data with no variation in values
-              if(length(unique(tb$Genotype)) > 2){
-                stat.test <- tb %>%
-                  filter(Genotype %in% comp_gen_list) %>% # filter out group with only 1 sample when testing
+#              if(length(unique(tb$Genotype)) > 2){
+#                stat.test <- tb %>%
+#                  filter(Genotype %in% comp_gen_list) %>% # filter out group with only 1 sample when testing
                   # group_by_("MouseID","Genotype") %>%
                   # summarize_(.dots = setNames(paste0('mean(', List_var[i], ')'), List_var[i])) %>%
                   # ungroup() #%>%
-                  anova_test(dv=List_var[i], wid="MouseID", within=xaxis, between="Genotype")
-              }else{
+#                  anova_test(dv=List_var[i], wid="MouseID", within=xaxis, between="Genotype")
+#              }else{
                 stat.test <- tb %>%
                   filter(Genotype %in% comp_gen_list) %>% # filter out group with only 1 sample when testing
                   # group_by_("MouseID","Genotype") %>%
                   # summarize_(.dots = setNames(paste0('mean(', List_var[i], ')'), List_var[i])) %>%
                   # ungroup() #%>%
                   t_test(as.formula(paste0(List_var[i], "~Genotype")))
-              }
+#              }
               if(class(stat.test)[2] == "list"){
                 stat.test <- stat.test$ANOVA
               }
